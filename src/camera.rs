@@ -15,7 +15,7 @@ pub struct PerspectiveCamera {
 
 impl PerspectiveCamera {
     pub fn new(resolution: Point2<i32>) -> Self {
-        // Calculate rays for rectangular viewport, see: https://en.wikipedia.org/wiki/Ray_tracing_(graphics)
+        // Calculate rays for rectangular viewport, see: https://en.wikipedia.org/wiki/Ray_tracing_(graphics).
         let t = -Vector3::z();
         let b = t.cross(&Vector3::y());
         let v = b.cross(&t);
