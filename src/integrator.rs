@@ -1,36 +1,46 @@
-use nalgebra::{Point3, Vector3};
+use nalgebra::Vector3;
 
-use crate::{
-    scene::{Interaction, Scene},
-    Ray, Spectrum,
-};
+use crate::{scene::Scene, Ray, Spectrum};
 
 pub trait Integrator {
-    fn lo(&self, scene: &Scene, isect: Interaction) -> Spectrum;
+    fn lo(&self, scene: &Scene, ray: Ray) -> Spectrum;
 }
 
 #[derive(Default)]
-pub struct WhittedIntegrator;
+pub struct WhittedIntegrator {
+    max_depth: u32,
+}
 
-impl Integrator for WhittedIntegrator {
-    fn lo(&self, scene: &Scene, isect: Interaction) -> Spectrum {
+impl WhittedIntegrator {
+    pub fn new(max_depth: u32) -> Self {
+        Self { max_depth }
+    }
+
+    fn li(&self, scene: &Scene, ray: Ray, depth: u32) -> Spectrum {
         let mut l = Spectrum::BLACK;
-        for light in scene.lights_iter() {
-            // Check for shadows by sending a ray to the light.
-            let light_p = light
-                .get_object_to_world()
-                .transform_point(&Point3::new(0.0, 0.0, 0.0));
-            let hit_to_light = light_p - isect.p;
-            let wi = hit_to_light.normalize();
+        if let Some(isect) = scene.intersect(ray) {
+            // Determine local color due to direct illumination.
+            for light in scene.lights_iter() {
+                // Check for shadows by sending a ray to the light.
+                let shadow_ray = isect.shadow_ray(light);
+                let wi_dot_n = Vector3::dot(&shadow_ray.d, &isect.n);
+                if wi_dot_n > 0.0 && scene.intersect(shadow_ray).is_none() {
+                    // Only shades the intersection if not in shadow.
+                    l += Spectrum::BLUE * light.i() * wi_dot_n;
+                }
+            }
 
-            let mut shadow_ray = Ray::new(isect.p, wi);
-            shadow_ray.t_max = hit_to_light.norm();
-            if Vector3::dot(&wi, &isect.n) > 0.0 && scene.intersect(shadow_ray).is_none() {
-                // Only shades the intersection if not in shadow.
-                l += Spectrum::BLUE;
+            if depth > 0 {
+                // Determine color from a ray comming from the reflection direction.
+                l += self.li(scene, isect.reflect_ray(), depth - 1);
             }
         }
-
         l
+    }
+}
+
+impl Integrator for WhittedIntegrator {
+    fn lo(&self, scene: &Scene, ray: Ray) -> Spectrum {
+        self.li(&scene, ray, self.max_depth)
     }
 }

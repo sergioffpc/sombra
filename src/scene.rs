@@ -2,7 +2,7 @@ use std::slice::Iter;
 
 use nalgebra::{Matrix4, Point3, Vector3};
 
-use crate::{light::Light, shape::Shape, Ray};
+use crate::{light::Light, shape::Shape, Ray, Spectrum};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Interaction {
@@ -10,6 +10,27 @@ pub struct Interaction {
     pub n: Vector3<f32>,
     pub t: f32,
     pub wo: Vector3<f32>,
+}
+
+impl Interaction {
+    pub fn reflect_ray(&self) -> Ray {
+        let wr = (-self.wo - 2.0 * Vector3::dot(&-self.wo, &self.n) * self.n).normalize();
+
+        Ray::new(self.p + self.n * std::f32::EPSILON, wr)
+    }
+
+    pub fn shadow_ray(&self, light: &LightPrimitive) -> Ray {
+        let light_p = light
+            .get_object_to_world()
+            .transform_point(&Point3::new(0.0, 0.0, 0.0));
+        let hit_to_light = light_p - self.p;
+        let wi = hit_to_light.normalize();
+
+        let mut ray = Ray::new(self.p + self.n * std::f32::EPSILON, wi);
+        ray.t_max = hit_to_light.norm();
+
+        ray
+    }
 }
 
 pub struct GeometryPrimitive {
@@ -65,6 +86,10 @@ impl LightPrimitive {
             object_to_world: Matrix4::identity(),
             world_to_object: Matrix4::identity(),
         }
+    }
+
+    pub fn i(&self) -> Spectrum {
+        self.light.i()
     }
 
     pub fn get_object_to_world(&self) -> Matrix4<f32> {

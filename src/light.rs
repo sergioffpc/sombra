@@ -1,13 +1,13 @@
 use crate::Spectrum;
 
 pub trait Light {
-    fn li(&self) -> Spectrum;
+    fn i(&self) -> Spectrum;
 }
 
 pub struct PointLight;
 
 impl Light for PointLight {
-    fn li(&self) -> Spectrum {
+    fn i(&self) -> Spectrum {
         Spectrum::WHITE
     }
 }

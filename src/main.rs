@@ -8,14 +8,14 @@ use sombra::{
     light::PointLight,
     scene::{GeometryPrimitive, LightPrimitive, Scene},
     shape::{Plane, Sphere},
-    Film, Spectrum,
+    Film,
 };
 
 fn main() {
     let resolution = Point2::new(1280, 720);
 
-    let mut c = PerspectiveCamera::new(resolution);
-    c.look_at(
+    let mut camera = PerspectiveCamera::new(resolution);
+    camera.look_at(
         Point3::new(0.0, 0.0, 5.0),
         Point3::new(0.0, 0.0, 0.0),
         Vector3::y(),
@@ -40,10 +40,10 @@ fn main() {
     scene.add_geometry(sphere);
 
     let mut light = LightPrimitive::new(Box::new(PointLight));
-    light.set_object_to_world(Translation3::new(0.0, 0.5, 0.0).to_homogeneous());
+    light.set_object_to_world(Translation3::new(0.0, 1.0, 0.0).to_homogeneous());
     scene.add_light(light);
 
-    let integrator = WhittedIntegrator::default();
+    let integrator = WhittedIntegrator::new(0);
 
     let mut film = Film::new(resolution);
 
@@ -51,10 +51,7 @@ fn main() {
     for y in 0..resolution.y {
         for x in 0..resolution.x {
             let p = Point2::new(x, y);
-            let s = scene
-                .intersect(c.view_ray(p))
-                .map_or(Spectrum::BLACK, |isect| integrator.lo(&scene, isect));
-            film.add_sample(p, s);
+            film.add_sample(p, integrator.lo(&scene, camera.view_ray(p)));
 
             progress.inc(1);
         }
