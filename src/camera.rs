@@ -16,24 +16,27 @@ pub struct PerspectiveCamera {
 impl PerspectiveCamera {
     pub fn new(resolution: Point2<i32>) -> Self {
         // Calculate rays for rectangular viewport, see: https://en.wikipedia.org/wiki/Ray_tracing_(graphics).
-        let t = -Vector3::z();
-        let b = t.cross(&Vector3::y());
-        let v = b.cross(&t);
+        let forward = -Vector3::z();
+        let right = forward.cross(&Vector3::y());
+        let up = right.cross(&forward);
 
-        let gx = std::f32::consts::FRAC_PI_4.tan();
-        let gy = gx * (resolution.y as f32 / resolution.x as f32);
+        let half_fov = std::f32::consts::FRAC_PI_4;
 
-        let qx = (2.0 * gx / resolution.x as f32) * b;
-        let qy = (2.0 * gy / resolution.y as f32) * v;
+        let viewport_half_width = half_fov.tan();
+        let viewport_half_height =
+            viewport_half_width * (resolution.y as f32 / resolution.x as f32);
 
-        let p0y = t - gx * b - gy * v;
+        let pixel_shift_right = (2.0 * viewport_half_width / resolution.x as f32) * right;
+        let pixel_shift_up = (2.0 * viewport_half_height / resolution.y as f32) * up;
+
+        let viewport_o = forward - viewport_half_width * right - viewport_half_height * up;
 
         #[rustfmt::skip]
         let raster_to_camera = Matrix4::new(
-            qx.x, qy.x, 0.0, p0y.x,
-            qx.y, qy.y, 0.0, p0y.y,
-            qx.z, qy.z, 0.0, p0y.z,
-            0.0, 0.0, 0.0, 1.0,
+            pixel_shift_right.x,  pixel_shift_up.x, 0.0,  viewport_o.x,
+            pixel_shift_right.y, -pixel_shift_up.y, 0.0, -viewport_o.y,
+            pixel_shift_right.z,  pixel_shift_up.z, 0.0,  viewport_o.z,
+                            0.0,               0.0, 0.0,           1.0,
         );
 
         Self {

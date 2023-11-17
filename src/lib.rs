@@ -14,7 +14,7 @@ pub mod scene;
 pub mod shape;
 pub mod texture;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
     pub o: Point3<f32>,
     pub d: Vector3<f32>,
@@ -263,5 +263,50 @@ impl Film {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nalgebra::{Point3, Scale3, Translation3, Vector3};
+
+    use crate::Ray;
+
+    #[test]
+    fn test_ray_position() {
+        assert_eq!(
+            Ray::new(Point3::new(2.0, 3.0, 4.0), Vector3::new(1.0, 0.0, 0.0)).position(0.0),
+            Point3::new(2.0, 3.0, 4.0)
+        );
+
+        assert_eq!(
+            Ray::new(Point3::new(2.0, 3.0, 4.0), Vector3::new(1.0, 0.0, 0.0)).position(1.0),
+            Point3::new(3.0, 3.0, 4.0)
+        );
+
+        assert_eq!(
+            Ray::new(Point3::new(2.0, 3.0, 4.0), Vector3::new(1.0, 0.0, 0.0)).position(-1.0),
+            Point3::new(1.0, 3.0, 4.0)
+        );
+
+        assert_eq!(
+            Ray::new(Point3::new(2.0, 3.0, 4.0), Vector3::new(1.0, 0.0, 0.0)).position(2.5),
+            Point3::new(4.5, 3.0, 4.0)
+        );
+    }
+
+    #[test]
+    fn test_ray_transform() {
+        assert_eq!(
+            Ray::new(Point3::new(1.0, 2.0, 3.0), Vector3::new(0.0, 1.0, 0.0))
+                .transform(Translation3::new(3.0, 4.0, 5.0).to_homogeneous()),
+            Ray::new(Point3::new(4.0, 6.0, 8.0), Vector3::new(0.0, 1.0, 0.0))
+        );
+
+        assert_eq!(
+            Ray::new(Point3::new(1.0, 2.0, 3.0), Vector3::new(0.0, 1.0, 0.0))
+                .transform(Scale3::new(2.0, 3.0, 4.0).to_homogeneous()),
+            Ray::new(Point3::new(2.0, 6.0, 12.0), Vector3::new(0.0, 3.0, 0.0))
+        );
     }
 }

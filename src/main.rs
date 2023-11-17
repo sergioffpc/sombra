@@ -16,7 +16,7 @@ fn main() {
 
     let mut c = PerspectiveCamera::new(resolution);
     c.look_at(
-        Point3::new(0.0, 0.0, 4.0),
+        Point3::new(0.0, 0.0, 5.0),
         Point3::new(0.0, 0.0, 0.0),
         Vector3::y(),
     );
@@ -25,8 +25,8 @@ fn main() {
 
     let mut plane = GeometryPrimitive::new(Box::new(Plane));
     plane.set_object_to_world(
-        Translation3::new(0.0, 1.0, 0.0).to_homogeneous()
-            * Rotation3::from_axis_angle(&Vector3::x_axis(), std::f32::consts::FRAC_PI_2)
+        Translation3::new(0.0, -1.0, 0.0).to_homogeneous()
+            * Rotation3::from_axis_angle(&Vector3::x_axis(), -std::f32::consts::FRAC_PI_2)
                 .to_homogeneous(),
     );
     scene.add_geometry(plane);
@@ -40,7 +40,7 @@ fn main() {
     scene.add_geometry(sphere);
 
     let mut light = LightPrimitive::new(Box::new(PointLight));
-    light.set_object_to_world(Translation3::new(10.0, -10.0, 10.0).to_homogeneous());
+    light.set_object_to_world(Translation3::new(0.0, 0.5, 0.0).to_homogeneous());
     scene.add_light(light);
 
     let integrator = WhittedIntegrator::default();
