@@ -1,15 +1,12 @@
 use std::ops;
 
-use nalgebra::{Matrix4, Point2, Point3, Vector3};
-use openexr::{
-    core::header::Header,
-    rgba::{Rgba, RgbaChannels, RgbaOutputFile},
-};
+use nalgebra::{Matrix4, Point3, Vector3};
 
 pub mod camera;
 pub mod integrator;
 pub mod light;
 pub mod reflection;
+pub mod sampler;
 pub mod scene;
 pub mod shape;
 pub mod texture;
@@ -227,42 +224,13 @@ impl ops::SubAssign<Spectrum> for Spectrum {
     }
 }
 
-pub struct Film {
-    resolution: Point2<i32>,
-    pixels: Vec<Spectrum>,
-}
-
-impl Film {
-    pub fn new(resolution: Point2<i32>) -> Self {
+impl From<Vector3<f32>> for Spectrum {
+    fn from(value: Vector3<f32>) -> Self {
         Self {
-            resolution,
-            pixels: vec![Spectrum::BLACK; (resolution.x * resolution.y) as usize],
+            r: value.x,
+            g: value.y,
+            b: value.z,
         }
-    }
-
-    pub fn add_sample(&mut self, p: Point2<i32>, s: Spectrum) {
-        let index = p.y * self.resolution.x + p.x;
-        self.pixels[index as usize] += s;
-    }
-
-    pub fn write(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let header = Header::from_dimensions(self.resolution.x, self.resolution.y);
-        let mut file = RgbaOutputFile::new(filename, &header, RgbaChannels::WriteRgba, 1)?;
-
-        file.set_frame_buffer(
-            self.pixels
-                .iter()
-                .map(|s| Rgba::from_f32(s.r, s.g, s.b, 1.0))
-                .collect::<Vec<_>>()
-                .as_slice(),
-            1,
-            self.resolution.x as usize,
-        )?;
-        unsafe {
-            file.write_pixels(self.resolution.y)?;
-        }
-
-        Ok(())
     }
 }
 

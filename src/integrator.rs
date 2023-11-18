@@ -26,7 +26,7 @@ impl WhittedIntegrator {
                 let wi_dot_n = Vector3::dot(&shadow_ray.d, &isect.n);
                 if wi_dot_n > 0.0 && scene.intersect(shadow_ray).is_none() {
                     // Only shades the intersection if not in shadow.
-                    l += Spectrum::BLUE * light.i() * wi_dot_n;
+                    l += Spectrum::BLUE * light.li() * wi_dot_n;
                 }
             }
 

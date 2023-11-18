@@ -3,16 +3,17 @@
 use indicatif::ProgressBar;
 use nalgebra::{Point2, Point3, Rotation3, Translation3, Vector3};
 use sombra::{
-    camera::{Camera, PerspectiveCamera},
+    camera::{Camera, Film, PerspectiveCamera},
     integrator::{Integrator, WhittedIntegrator},
     light::PointLight,
+    sampler::{RandomSampler, Sampler},
     scene::{GeometryPrimitive, LightPrimitive, Scene},
     shape::{Plane, Sphere},
-    Film,
 };
 
 fn main() {
     let resolution = Point2::new(1280, 720);
+    let samples_count = 8;
 
     let mut camera = PerspectiveCamera::new(resolution);
     camera.look_at(
@@ -45,15 +46,19 @@ fn main() {
 
     let integrator = WhittedIntegrator::new(0);
 
-    let mut film = Film::new(resolution);
+    let sampler = RandomSampler;
+    let mut film = Film::new(resolution, samples_count);
 
-    let progress = ProgressBar::new((resolution.x * resolution.y) as u64);
+    let progress = ProgressBar::new((resolution.x * resolution.y * samples_count) as u64);
     for y in 0..resolution.y {
         for x in 0..resolution.x {
-            let p = Point2::new(x, y);
-            film.add_sample(p, integrator.lo(&scene, camera.view_ray(p)));
+            for _ in 0..samples_count {
+                let p = Point2::new(x, y);
+                let u = sampler.get_sample2d();
+                film.add_sample(p, integrator.lo(&scene, camera.view_ray(p, u)));
 
-            progress.inc(1);
+                progress.inc(1);
+            }
         }
     }
     progress.finish();

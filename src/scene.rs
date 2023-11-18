@@ -5,14 +5,14 @@ use nalgebra::{Matrix4, Point3, Vector3};
 use crate::{light::Light, shape::Shape, Ray, Spectrum};
 
 #[derive(Clone, Copy, Debug)]
-pub struct Interaction {
+pub struct SurfaceInteraction {
     pub p: Point3<f32>,
     pub n: Vector3<f32>,
     pub t: f32,
     pub wo: Vector3<f32>,
 }
 
-impl Interaction {
+impl SurfaceInteraction {
     pub fn reflect_ray(&self) -> Ray {
         let wr = (-self.wo - 2.0 * Vector3::dot(&-self.wo, &self.n) * self.n).normalize();
 
@@ -20,10 +20,7 @@ impl Interaction {
     }
 
     pub fn shadow_ray(&self, light: &LightPrimitive) -> Ray {
-        let light_p = light
-            .get_object_to_world()
-            .transform_point(&Point3::new(0.0, 0.0, 0.0));
-        let hit_to_light = light_p - self.p;
+        let hit_to_light = light.position() - self.p;
         let wi = hit_to_light.normalize();
 
         let mut ray = Ray::new(self.p + self.n * std::f32::EPSILON, wi);
@@ -48,15 +45,19 @@ impl GeometryPrimitive {
         }
     }
 
-    pub fn intersect(&self, r: Ray) -> Option<Interaction> {
+    pub fn intersect(&self, r: Ray) -> Option<SurfaceInteraction> {
         self.shape
             .intersect(r.transform(self.world_to_object))
-            .map(|(p, n, t)| Interaction {
+            .map(|(p, n, t)| SurfaceInteraction {
                 p: self.object_to_world.transform_point(&p),
                 n: self.world_to_object.transpose().transform_vector(&n),
                 t,
                 wo: -r.d,
             })
+    }
+
+    pub fn position(&self) -> Point3<f32> {
+        self.get_object_to_world().column(3).xyz().into()
     }
 
     pub fn get_object_to_world(&self) -> Matrix4<f32> {
@@ -88,8 +89,12 @@ impl LightPrimitive {
         }
     }
 
-    pub fn i(&self) -> Spectrum {
+    pub fn li(&self) -> Spectrum {
         self.light.i()
+    }
+
+    pub fn position(&self) -> Point3<f32> {
+        self.get_object_to_world().column(3).xyz().into()
     }
 
     pub fn get_object_to_world(&self) -> Matrix4<f32> {
@@ -129,7 +134,7 @@ impl Scene {
         self.lights.iter()
     }
 
-    pub fn intersect(&self, mut r: Ray) -> Option<Interaction> {
+    pub fn intersect(&self, mut r: Ray) -> Option<SurfaceInteraction> {
         self.geometries_iter().fold(None, |closest, geometry| {
             if let Some(isect) = geometry.intersect(r) {
                 r.t_max = isect.t;
