@@ -57,24 +57,6 @@ impl Shape for Plane {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Disk;
-
-impl Shape for Disk {
-    fn intersect(&self, r: Ray) -> Option<(Point3<f32>, Vector3<f32>, f32)> {
-        if let Some((p, n, t)) = Plane.intersect(r) {
-            let disk_p = Point3::new(0.0, 0.0, 0.0);
-            let dist_p = p - disk_p;
-            let disk_square_radius = 1.0;
-            if Vector3::dot(&dist_p, &dist_p) <= disk_square_radius {
-                return Some((p, n, t));
-            }
-        }
-
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use nalgebra::{Point3, Scale3, Translation3, Vector3};

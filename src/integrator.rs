@@ -1,9 +1,9 @@
 use nalgebra::Vector3;
 
-use crate::{scene::Scene, Ray, Spectrum};
+use crate::{sampler::Sampler, scene::Scene, Ray, Spectrum};
 
 pub trait Integrator {
-    fn lo(&self, scene: &Scene, ray: Ray) -> Spectrum;
+    fn lo(&self, scene: &Scene, ray: Ray, sampler: &dyn Sampler) -> Spectrum;
 }
 
 #[derive(Default)]
@@ -16,23 +16,32 @@ impl WhittedIntegrator {
         Self { max_depth }
     }
 
-    fn li(&self, scene: &Scene, ray: Ray, depth: u32) -> Spectrum {
+    fn li(scene: &Scene, ray: Ray, sampler: &dyn Sampler, depth: u32) -> Spectrum {
         let mut l = Spectrum::BLACK;
         if let Some(isect) = scene.intersect(ray) {
+            l += isect.geometry.le(&isect);
+
             // Determine local color due to direct illumination.
             for light in scene.lights_iter() {
                 // Check for shadows by sending a ray to the light.
-                let shadow_ray = isect.shadow_ray(light);
-                let wi_dot_n = Vector3::dot(&shadow_ray.d, &isect.n);
+                let hit_to_light = light.position() - isect.p;
+                let wi = hit_to_light.normalize();
+                let mut shadow_ray = Ray::new(isect.p + isect.n * std::f32::EPSILON, wi);
+                shadow_ray.t_max = hit_to_light.norm();
+
+                let wi_dot_n = Vector3::dot(&wi, &isect.n);
                 if wi_dot_n > 0.0 && scene.intersect(shadow_ray).is_none() {
                     // Only shades the intersection if not in shadow.
-                    l += Spectrum::BLUE * light.li() * wi_dot_n;
+                    l += isect.geometry.f(&isect, wi) * light.li(&isect) * wi_dot_n;
                 }
             }
 
             if depth > 0 {
                 // Determine color from a ray comming from the reflection direction.
-                l += self.li(scene, isect.reflect_ray(), depth - 1);
+                let sample_wi = sampler.sample_hemisphere(isect.n);
+                let reflect_ray = Ray::new(isect.p + isect.n * std::f32::EPSILON, sample_wi);
+
+                l += Self::li(scene, reflect_ray, sampler, depth - 1);
             }
         }
         l
@@ -40,7 +49,7 @@ impl WhittedIntegrator {
 }
 
 impl Integrator for WhittedIntegrator {
-    fn lo(&self, scene: &Scene, ray: Ray) -> Spectrum {
-        self.li(&scene, ray, self.max_depth)
+    fn lo(&self, scene: &Scene, ray: Ray, sampler: &dyn Sampler) -> Spectrum {
+        Self::li(scene, ray, sampler, self.max_depth)
     }
 }

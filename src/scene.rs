@@ -1,59 +1,44 @@
-use std::slice::Iter;
+use std::{slice::Iter, sync::Arc};
 
 use nalgebra::{Matrix4, Point3, Vector3};
 
-use crate::{light::Light, shape::Shape, Ray, Spectrum};
+use crate::{light::Light, reflection::BxDF, reflection::Reflection, shape::Shape, Ray, Spectrum};
 
-#[derive(Clone, Copy, Debug)]
 pub struct SurfaceInteraction {
     pub p: Point3<f32>,
     pub n: Vector3<f32>,
     pub t: f32,
     pub wo: Vector3<f32>,
-}
-
-impl SurfaceInteraction {
-    pub fn reflect_ray(&self) -> Ray {
-        let wr = (-self.wo - 2.0 * Vector3::dot(&-self.wo, &self.n) * self.n).normalize();
-
-        Ray::new(self.p + self.n * std::f32::EPSILON, wr)
-    }
-
-    pub fn shadow_ray(&self, light: &LightPrimitive) -> Ray {
-        let hit_to_light = light.position() - self.p;
-        let wi = hit_to_light.normalize();
-
-        let mut ray = Ray::new(self.p + self.n * std::f32::EPSILON, wi);
-        ray.t_max = hit_to_light.norm();
-
-        ray
-    }
+    pub geometry: Arc<GeometryPrimitive>,
 }
 
 pub struct GeometryPrimitive {
     shape: Box<dyn Shape>,
+    bxdf: BxDF,
     object_to_world: Matrix4<f32>,
     world_to_object: Matrix4<f32>,
 }
 
 impl GeometryPrimitive {
-    pub fn new(shape: Box<dyn Shape>) -> Self {
+    pub fn new(shape: Box<dyn Shape>, bxdf: BxDF) -> Self {
         Self {
             shape,
+            bxdf,
             object_to_world: Matrix4::identity(),
             world_to_object: Matrix4::identity(),
         }
     }
 
-    pub fn intersect(&self, r: Ray) -> Option<SurfaceInteraction> {
-        self.shape
-            .intersect(r.transform(self.world_to_object))
-            .map(|(p, n, t)| SurfaceInteraction {
-                p: self.object_to_world.transform_point(&p),
-                n: self.world_to_object.transpose().transform_vector(&n),
-                t,
-                wo: -r.d,
-            })
+    pub fn intersect(&self, r: Ray) -> Option<(Point3<f32>, Vector3<f32>, f32)> {
+        self.shape.intersect(r.transform(self.world_to_object))
+    }
+
+    pub fn le(&self, _isect: &SurfaceInteraction) -> Spectrum {
+        Spectrum::BLACK
+    }
+
+    pub fn f(&self, isect: &SurfaceInteraction, wi: Vector3<f32>) -> Spectrum {
+        self.bxdf.f(isect, wi)
     }
 
     pub fn position(&self) -> Point3<f32> {
@@ -89,7 +74,7 @@ impl LightPrimitive {
         }
     }
 
-    pub fn li(&self) -> Spectrum {
+    pub fn li(&self, _isect: &SurfaceInteraction) -> Spectrum {
         self.light.i()
     }
 
@@ -113,33 +98,42 @@ impl LightPrimitive {
 
 #[derive(Default)]
 pub struct Scene {
-    geometries: Vec<GeometryPrimitive>,
-    lights: Vec<LightPrimitive>,
+    geometries: Vec<Arc<GeometryPrimitive>>,
+    lights: Vec<Arc<LightPrimitive>>,
 }
 
 impl Scene {
     pub fn add_geometry(&mut self, geometry: GeometryPrimitive) {
-        self.geometries.push(geometry);
+        self.geometries.push(Arc::new(geometry));
     }
 
-    pub fn geometries_iter(&self) -> Iter<'_, GeometryPrimitive> {
+    pub fn geometries_iter(&self) -> Iter<'_, Arc<GeometryPrimitive>> {
         self.geometries.iter()
     }
 
     pub fn add_light(&mut self, light: LightPrimitive) {
-        self.lights.push(light);
+        self.lights.push(Arc::new(light));
     }
 
-    pub fn lights_iter(&self) -> Iter<'_, LightPrimitive> {
+    pub fn lights_iter(&self) -> Iter<'_, Arc<LightPrimitive>> {
         self.lights.iter()
     }
 
     pub fn intersect(&self, mut r: Ray) -> Option<SurfaceInteraction> {
         self.geometries_iter().fold(None, |closest, geometry| {
-            if let Some(isect) = geometry.intersect(r) {
-                r.t_max = isect.t;
+            if let Some((p, n, t)) = geometry.intersect(r) {
+                r.t_max = t;
 
-                Some(isect)
+                Some(SurfaceInteraction {
+                    p: geometry.get_object_to_world().transform_point(&p),
+                    n: geometry
+                        .get_world_to_object()
+                        .transpose()
+                        .transform_vector(&n),
+                    t,
+                    wo: -r.d,
+                    geometry: geometry.clone(),
+                })
             } else {
                 closest
             }

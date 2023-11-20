@@ -4,11 +4,11 @@ use openexr::{
     rgba::{Rgba, RgbaChannels, RgbaOutputFile},
 };
 
-use crate::{Ray, Spectrum};
+use crate::{sampler::Sampler, Ray, Spectrum};
 
 pub trait Camera {
     fn look_at(&mut self, eye: Point3<f32>, target: Point3<f32>, up: Vector3<f32>);
-    fn view_ray(&self, p: Point2<i32>, u: Point2<f32>) -> Ray;
+    fn view_ray(&self, p: Point2<i32>, sampler: &dyn Sampler) -> Ray;
 }
 
 pub struct PerspectiveCamera {
@@ -57,7 +57,8 @@ impl Camera for PerspectiveCamera {
         self.world_to_camera = self.camera_to_world.try_inverse().unwrap();
     }
 
-    fn view_ray(&self, p: Point2<i32>, u: Point2<f32>) -> Ray {
+    fn view_ray(&self, p: Point2<i32>, sampler: &dyn Sampler) -> Ray {
+        let u = sampler.sample_point2();
         let o = Point3::new(0.0, 0.0, 0.0);
         let d = self.raster_to_camera.transform_point(&Point3::new(
             p.x as f32 + u.x,
@@ -74,7 +75,7 @@ impl Camera for PerspectiveCamera {
 
 pub struct Film {
     resolution: Point2<i32>,
-    samples_count: i32,
+    samples_per_pixel: i32,
     pixels: Vec<Spectrum>,
 }
 
@@ -82,7 +83,7 @@ impl Film {
     pub fn new(resolution: Point2<i32>, samples_count: i32) -> Self {
         Self {
             resolution,
-            samples_count,
+            samples_per_pixel: samples_count,
             pixels: vec![Spectrum::BLACK; (resolution.x * resolution.y) as usize],
         }
     }
@@ -100,7 +101,7 @@ impl Film {
             self.pixels
                 .iter()
                 .map(|&s| {
-                    let s = s / self.samples_count as f32;
+                    let s = s / self.samples_per_pixel as f32;
 
                     Rgba::from_f32(s.r, s.g, s.b, 1.0)
                 })
