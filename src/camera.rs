@@ -58,7 +58,7 @@ impl Camera for PerspectiveCamera {
     }
 
     fn view_ray(&self, p: Point2<i32>, sampler: &dyn Sampler) -> Ray {
-        let u = sampler.sample_point2();
+        let u = Point2::new(sampler.next(), sampler.next());
         let o = Point3::new(0.0, 0.0, 0.0);
         let d = self.raster_to_camera.transform_point(&Point3::new(
             p.x as f32 + u.x,

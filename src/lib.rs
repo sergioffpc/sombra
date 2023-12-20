@@ -5,11 +5,11 @@ use nalgebra::{Matrix4, Point3, Vector3};
 pub mod camera;
 pub mod integrator;
 pub mod light;
+pub mod material;
 pub mod reflection;
 pub mod sampler;
 pub mod scene;
 pub mod shape;
-pub mod texture;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
@@ -23,7 +23,7 @@ impl Ray {
         Self {
             o,
             d,
-            t_max: std::f32::MAX,
+            t_max: f32::MAX,
         }
     }
 
@@ -42,10 +42,10 @@ impl Ray {
 
 pub fn quadratic_solver(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
     match b * b - 4.0 * a * c {
-        discrim if discrim >= 0.0 => {
-            let sqrt_discrim = discrim.sqrt();
-            let t1 = (-b - sqrt_discrim) / (2.0 * a);
-            let t2 = (-b + sqrt_discrim) / (2.0 * a);
+        discriminant if discriminant >= 0.0 => {
+            let sqrt_discriminant = discriminant.sqrt();
+            let t1 = (-b - sqrt_discriminant) / (2.0 * a);
+            let t2 = (-b + sqrt_discriminant) / (2.0 * a);
 
             Some((t1.min(t2), t1.max(t2)))
         }
@@ -53,7 +53,7 @@ pub fn quadratic_solver(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Spectrum {
     pub r: f32,
     pub g: f32,

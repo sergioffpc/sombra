@@ -21,8 +21,8 @@ impl Shape for Sphere {
         let c = Vector3::dot(&sphere_to_ray, &sphere_to_ray) - sphere_radius;
 
         match quadratic_solver(a, b, c) {
-            Some((t_min, _)) if t_min > 0.0 && t_min < r.t_max => Some(t_min),
-            Some((_, t_max)) if t_max > 0.0 && t_max < r.t_max => Some(t_max),
+            Some((t_min, _)) if t_min > f32::EPSILON && t_min < r.t_max => Some(t_min),
+            Some((_, t_max)) if t_max > f32::EPSILON && t_max < r.t_max => Some(t_max),
             _ => None,
         }
         .map(|t| {
@@ -47,7 +47,7 @@ impl Shape for Plane {
             let plane_to_ray = plane_p - r.o;
             let t = Vector3::dot(&plane_to_ray, &plane_n) / ray_dot_plane;
 
-            if t > 0.0 {
+            if t > f32::EPSILON {
                 let p = r.position(t);
                 return Some((p, plane_n, t));
             }

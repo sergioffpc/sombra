@@ -2,7 +2,9 @@ use std::{slice::Iter, sync::Arc};
 
 use nalgebra::{Matrix4, Point3, Vector3};
 
-use crate::{light::Light, reflection::BxDF, reflection::Reflection, shape::Shape, Ray, Spectrum};
+use crate::{
+    light::Light, material::Material, reflection::Reflection, shape::Shape, Ray, Spectrum,
+};
 
 pub struct SurfaceInteraction {
     pub p: Point3<f32>,
@@ -12,18 +14,34 @@ pub struct SurfaceInteraction {
     pub geometry: Arc<GeometryPrimitive>,
 }
 
+impl SurfaceInteraction {
+    pub fn is_visible(&self, scene: &Scene, light: &LightPrimitive) -> bool {
+        let hit_to_light = light.position() - self.p;
+        let wi = hit_to_light.normalize();
+        let mut shadow_ray = self.spawn_ray(wi);
+        shadow_ray.t_max = hit_to_light.norm();
+
+        let wi_dot_n = wi.dot(&self.n);
+        wi_dot_n > 0.0 && scene.intersect(shadow_ray).is_none()
+    }
+
+    pub fn spawn_ray(&self, d: Vector3<f32>) -> Ray {
+        Ray::new(self.p + self.n * f32::EPSILON, d)
+    }
+}
+
 pub struct GeometryPrimitive {
     shape: Box<dyn Shape>,
-    bxdf: BxDF,
+    material: Box<dyn Material>,
     object_to_world: Matrix4<f32>,
     world_to_object: Matrix4<f32>,
 }
 
 impl GeometryPrimitive {
-    pub fn new(shape: Box<dyn Shape>, bxdf: BxDF) -> Self {
+    pub fn new(shape: Box<dyn Shape>, material: Box<dyn Material>) -> Self {
         Self {
             shape,
-            bxdf,
+            material,
             object_to_world: Matrix4::identity(),
             world_to_object: Matrix4::identity(),
         }
@@ -37,8 +55,8 @@ impl GeometryPrimitive {
         Spectrum::BLACK
     }
 
-    pub fn f(&self, isect: &SurfaceInteraction, wi: Vector3<f32>) -> Spectrum {
-        self.bxdf.f(isect, wi)
+    pub fn bxdf(&self) -> &dyn Reflection {
+        self.material.bxdf()
     }
 
     pub fn position(&self) -> Point3<f32> {
@@ -74,8 +92,11 @@ impl LightPrimitive {
         }
     }
 
-    pub fn li(&self, _isect: &SurfaceInteraction) -> Spectrum {
-        self.light.i()
+    pub fn li(&self, isect: &SurfaceInteraction) -> (Spectrum, Vector3<f32>) {
+        let hit_to_light = self.position() - isect.p;
+        let wi = hit_to_light.normalize();
+
+        (self.light.i(), wi)
     }
 
     pub fn position(&self) -> Point3<f32> {
@@ -129,7 +150,8 @@ impl Scene {
                     n: geometry
                         .get_world_to_object()
                         .transpose()
-                        .transform_vector(&n),
+                        .transform_vector(&n)
+                        .normalize(),
                     t,
                     wo: -r.d,
                     geometry: geometry.clone(),
