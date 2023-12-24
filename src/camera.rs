@@ -8,7 +8,7 @@ use crate::{sampler::Sampler, Ray, Spectrum};
 
 pub trait Camera {
     fn look_at(&mut self, eye: Point3<f32>, target: Point3<f32>, up: Vector3<f32>);
-    fn view_ray(&self, p: Point2<i32>, sampler: &dyn Sampler) -> Ray;
+    fn view_ray(&self, p: Point2<i32>, sampler: &mut dyn Sampler) -> Ray;
 }
 
 pub struct PerspectiveCamera {
@@ -57,7 +57,7 @@ impl Camera for PerspectiveCamera {
         self.world_to_camera = self.camera_to_world.try_inverse().unwrap();
     }
 
-    fn view_ray(&self, p: Point2<i32>, sampler: &dyn Sampler) -> Ray {
+    fn view_ray(&self, p: Point2<i32>, sampler: &mut dyn Sampler) -> Ray {
         let u = Point2::new(sampler.next(), sampler.next());
         let o = Point3::new(0.0, 0.0, 0.0);
         let d = self.raster_to_camera.transform_point(&Point3::new(

@@ -8,7 +8,7 @@ pub trait Reflection {
     fn sample_f(
         &self,
         isect: &SurfaceInteraction,
-        sampler: &dyn Sampler,
+        sampler: &mut dyn Sampler,
     ) -> (Spectrum, Vector3<f32>);
 }
 
@@ -31,7 +31,7 @@ impl Reflection for LambertianReflection {
     fn sample_f(
         &self,
         isect: &SurfaceInteraction,
-        sampler: &dyn Sampler,
+        sampler: &mut dyn Sampler,
     ) -> (Spectrum, Vector3<f32>) {
         // θ (theta) is the inclination angle, ranging from 0 to π/2 for a hemisphere.
         let theta = sampler.next() * std::f32::consts::FRAC_PI_2;
@@ -42,10 +42,7 @@ impl Reflection for LambertianReflection {
         let y = theta.sin() * phi.sin();
         let z = theta.cos();
 
-        let mut wi = Vector3::new(x, y, z).normalize();
-        if wi.dot(&isect.n) < 0.0 {
-            wi *= -1.0;
-        }
+        let wi = Vector3::new(x, y, z).normalize();
 
         (self.f(isect, wi), wi)
     }
@@ -70,7 +67,7 @@ impl Reflection for SpecularReflection {
     fn sample_f(
         &self,
         isect: &SurfaceInteraction,
-        _sampler: &dyn Sampler,
+        _sampler: &mut dyn Sampler,
     ) -> (Spectrum, Vector3<f32>) {
         let wi = 2.0 * isect.n.dot(&isect.wo) * isect.n - isect.wo;
 

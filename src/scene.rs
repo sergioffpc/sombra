@@ -1,4 +1,4 @@
-use std::{slice::Iter, sync::Arc};
+use std::{fmt::Display, slice::Iter, sync::Arc};
 
 use nalgebra::{Matrix4, Point3, Vector3};
 
@@ -21,8 +21,7 @@ impl SurfaceInteraction {
         let mut shadow_ray = self.spawn_ray(wi);
         shadow_ray.t_max = hit_to_light.norm();
 
-        let wi_dot_n = wi.dot(&self.n);
-        wi_dot_n > 0.0 && scene.intersect(shadow_ray).is_none()
+        scene.intersect(shadow_ray).is_none()
     }
 
     pub fn spawn_ray(&self, d: Vector3<f32>) -> Ray {
@@ -31,6 +30,7 @@ impl SurfaceInteraction {
 }
 
 pub struct GeometryPrimitive {
+    label: String,
     shape: Box<dyn Shape>,
     material: Box<dyn Material>,
     object_to_world: Matrix4<f32>,
@@ -38,8 +38,9 @@ pub struct GeometryPrimitive {
 }
 
 impl GeometryPrimitive {
-    pub fn new(shape: Box<dyn Shape>, material: Box<dyn Material>) -> Self {
+    pub fn new(label: &str, shape: Box<dyn Shape>, material: Box<dyn Material>) -> Self {
         Self {
+            label: label.to_string(),
             shape,
             material,
             object_to_world: Matrix4::identity(),
@@ -74,6 +75,12 @@ impl GeometryPrimitive {
 
     pub fn get_world_to_object(&self) -> Matrix4<f32> {
         self.world_to_object
+    }
+}
+
+impl Display for GeometryPrimitive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.label)
     }
 }
 
@@ -160,5 +167,73 @@ impl Scene {
                 closest
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nalgebra::{Point2, Point3, Translation3, Vector3};
+
+    use crate::{
+        camera::{Camera, PerspectiveCamera},
+        material::MatteMaterial,
+        sampler::Sampler,
+        shape::Sphere,
+    };
+
+    struct ZeroSampler;
+
+    impl Sampler for ZeroSampler {
+        fn next(&mut self) -> f32 {
+            0.0
+        }
+    }
+
+    use super::{GeometryPrimitive, Scene};
+
+    #[test]
+    fn test_scene_intersect() {
+        let resolution = Point2::new(400, 400);
+        let mut camera = PerspectiveCamera::new(resolution);
+        camera.look_at(
+            Point3::new(0.0, 0.0, 5.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::y(),
+        );
+
+        let mut scene = Scene::default();
+        let mut sphere = GeometryPrimitive::new(
+            "sphere",
+            Box::new(Sphere),
+            Box::new(MatteMaterial::default()),
+        );
+        sphere.set_object_to_world(Translation3::new(0.0, 0.0, 0.0).to_homogeneous());
+        scene.add_geometry(sphere);
+
+        let light_p = Point3::new(0.0, 2.0, 0.0);
+
+        let mut sampler = ZeroSampler;
+        let ray = camera.view_ray(Point2::new(205, 160), &mut sampler);
+        let isect = scene.intersect(ray);
+        dbg!(isect.as_ref().unwrap().p);
+        dbg!(isect.as_ref().unwrap().n);
+
+        let hit_to_light = light_p - isect.as_ref().unwrap().p;
+        let wi = hit_to_light.normalize();
+        dbg!(wi);
+        dbg!(wi.dot(&isect.as_ref().unwrap().n));
+
+        let mut sampler = ZeroSampler;
+        let ray = camera.view_ray(Point2::new(195, 160), &mut sampler);
+        let isect = scene.intersect(ray);
+        dbg!(isect.as_ref().unwrap().p);
+        dbg!(isect.as_ref().unwrap().n);
+
+        let hit_to_light = light_p - isect.as_ref().unwrap().p;
+        let wi = hit_to_light.normalize();
+        dbg!(wi);
+        dbg!(wi.dot(&isect.as_ref().unwrap().n));
+
+        assert!(false);
     }
 }

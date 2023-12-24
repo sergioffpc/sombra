@@ -1,6 +1,6 @@
 use crate::{sampler::Sampler, scene::Scene, Ray, Spectrum};
 pub trait Integrator {
-    fn lo(&self, scene: &Scene, ray: Ray, sampler: &dyn Sampler) -> Spectrum;
+    fn lo(&self, scene: &Scene, ray: Ray, sampler: &mut dyn Sampler) -> Spectrum;
 }
 
 #[derive(Default)]
@@ -13,7 +13,7 @@ impl WhittedIntegrator {
         Self { max_depth }
     }
 
-    fn li(scene: &Scene, ray: Ray, sampler: &dyn Sampler, depth: u32) -> Spectrum {
+    fn li(scene: &Scene, ray: Ray, sampler: &mut dyn Sampler, depth: u32) -> Spectrum {
         let mut l = Spectrum::BLACK;
         if let Some(isect) = scene.intersect(ray) {
             l += isect.geometry.le(&isect);
@@ -22,19 +22,15 @@ impl WhittedIntegrator {
             for light in scene.lights_iter() {
                 if isect.is_visible(scene, light) {
                     let (li, wi) = light.li(&isect);
-                    let wi_dot_n = wi.dot(&isect.n);
-                    if wi_dot_n > 0.0 {
-                        let f = bxdf.f(&isect, wi);
-                        l += f * li * wi_dot_n;
-                    }
+                    let f = bxdf.f(&isect, wi);
+                    l += f * li * wi.dot(&isect.n).abs();
                 }
             }
 
             if depth > 0 {
                 let (f, wi) = bxdf.sample_f(&isect, sampler);
-                let ray = isect.spawn_ray(wi);
-                let li = Self::li(scene, ray, sampler, depth - 1);
-                l += f * li;
+                let li = Self::li(scene, isect.spawn_ray(wi), sampler, depth - 1);
+                l += f * li * wi.dot(&isect.n).abs();
             }
         }
         l
@@ -42,7 +38,7 @@ impl WhittedIntegrator {
 }
 
 impl Integrator for WhittedIntegrator {
-    fn lo(&self, scene: &Scene, ray: Ray, sampler: &dyn Sampler) -> Spectrum {
+    fn lo(&self, scene: &Scene, ray: Ray, sampler: &mut dyn Sampler) -> Spectrum {
         Self::li(scene, ray, sampler, self.max_depth)
     }
 }

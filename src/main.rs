@@ -24,7 +24,7 @@ struct Args {
     #[arg(long, default_value_t = 720)]
     height: i32,
 
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 128)]
     samples_per_pixel: i32,
 
     #[arg(long, default_value_t = String::from("image.exr"))]
@@ -45,7 +45,7 @@ fn main() {
     let mut scene = Scene::default();
 
     let plane_material = MatteMaterial::new(Spectrum::WHITE);
-    let mut plane = GeometryPrimitive::new(Box::new(Plane), Box::new(plane_material));
+    let mut plane = GeometryPrimitive::new("plane", Box::new(Plane), Box::new(plane_material));
     plane.set_object_to_world(
         Translation3::new(0.0, -1.0, 0.0).to_homogeneous()
             * Rotation3::from_axis_angle(&Vector3::x_axis(), -std::f32::consts::FRAC_PI_2)
@@ -54,20 +54,25 @@ fn main() {
     scene.add_geometry(plane);
 
     let right_sphere_matte = MirrorMaterial::new(Spectrum::WHITE / std::f32::consts::PI);
-    let mut right_sphere = GeometryPrimitive::new(Box::new(Sphere), Box::new(right_sphere_matte));
-    right_sphere.set_object_to_world(Translation3::new(2.0, 0.0, 0.0).to_homogeneous());
+    let mut right_sphere = GeometryPrimitive::new(
+        "right_sphere",
+        Box::new(Sphere),
+        Box::new(right_sphere_matte),
+    );
+    right_sphere.set_object_to_world(Translation3::new(1.0, 0.0, 0.0).to_homogeneous());
     scene.add_geometry(right_sphere);
 
     let left_sphere_matte = MatteMaterial::new(Spectrum::WHITE / std::f32::consts::PI);
-    let mut left_sphere = GeometryPrimitive::new(Box::new(Sphere), Box::new(left_sphere_matte));
-    left_sphere.set_object_to_world(Translation3::new(-2.0, 0.0, 0.0).to_homogeneous());
+    let mut left_sphere =
+        GeometryPrimitive::new("left_sphere", Box::new(Sphere), Box::new(left_sphere_matte));
+    left_sphere.set_object_to_world(Translation3::new(-1.0, 0.0, 0.0).to_homogeneous());
     scene.add_geometry(left_sphere);
 
-    let mut light = LightPrimitive::new(Box::new(PointLight::default()));
-    light.set_object_to_world(Translation3::new(0.0, 1.0, 0.0).to_homogeneous());
-    scene.add_light(light);
+    let mut center_light = LightPrimitive::new(Box::new(PointLight::default()));
+    center_light.set_object_to_world(Translation3::new(0.0, 2.0, 0.0).to_homogeneous());
+    scene.add_light(center_light);
 
-    let integrator = WhittedIntegrator::new(64);
+    let integrator = WhittedIntegrator::new(4);
 
     let samples_per_pixel = args.samples_per_pixel;
     let mut film = Film::new(resolution, samples_per_pixel);
@@ -80,10 +85,10 @@ fn main() {
     for y in 0..resolution.y {
         for x in 0..resolution.x {
             for _ in 0..samples_per_pixel {
-                let sampler = RandomSampler;
+                let mut sampler = RandomSampler::default();
                 let p = Point2::new(x, y);
-                let ray = camera.view_ray(p, &sampler);
-                let lo = integrator.lo(&scene, ray, &sampler);
+                let ray = camera.view_ray(p, &mut sampler);
+                let lo = integrator.lo(&scene, ray, &mut sampler);
                 film.add_sample(p, lo);
 
                 progress.inc(1);

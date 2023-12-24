@@ -1,15 +1,16 @@
 use rand::Rng;
 
 pub trait Sampler {
-    fn next(&self) -> f32;
+    fn next(&mut self) -> f32;
 }
 
-pub struct RandomSampler;
+#[derive(Default)]
+pub struct RandomSampler {
+    rng: rand::prelude::ThreadRng,
+}
 
 impl Sampler for RandomSampler {
-    fn next(&self) -> f32 {
-        let mut rng = rand::thread_rng();
-
-        rng.gen()
+    fn next(&mut self) -> f32 {
+        self.rng.gen()
     }
 }
