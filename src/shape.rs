@@ -27,7 +27,7 @@ impl Shape for Sphere {
         }
         .map(|t| {
             let p = r.position(t);
-            let n = (p - sphere_center).normalize();
+            let n = p - sphere_center;
 
             (p, n, t)
         })

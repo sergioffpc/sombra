@@ -37,7 +37,7 @@ fn main() {
     let resolution = Point2::new(args.width, args.height);
     let mut camera = PerspectiveCamera::new(resolution);
     camera.look_at(
-        Point3::new(0.0, 0.0, 5.0),
+        Point3::new(0.0, 1.0, 4.0),
         Point3::new(0.0, 0.0, 0.0),
         Vector3::y(),
     );
