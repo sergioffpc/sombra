@@ -68,7 +68,7 @@ fn main() {
     left_sphere.set_object_to_world(Translation3::new(-1.0, 0.0, 0.0).to_homogeneous());
     scene.add_geometry(left_sphere);
 
-    let mut center_light = LightPrimitive::new(Box::new(PointLight::default()));
+    let mut center_light = LightPrimitive::new(Box::<PointLight>::default());
     center_light.set_object_to_world(Translation3::new(0.0, 2.0, 0.0).to_homogeneous());
     scene.add_light(center_light);
 

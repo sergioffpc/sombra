@@ -1,6 +1,6 @@
 use std::{fmt::Display, slice::Iter, sync::Arc};
 
-use nalgebra::{Matrix4, Point3, Vector3, Vector4};
+use nalgebra::{Matrix4, Point3, Vector3};
 
 use crate::{
     light::Light, material::Material, reflection::Reflection, shape::Shape, Ray, Spectrum,
@@ -153,7 +153,7 @@ impl Scene {
                 r.t_max = t;
 
                 let mut inverse_transpose = geometry.get_world_to_object();
-                inverse_transpose.set_column(3, &Vector4::new(0.0, 0.0, 0.0, 1.0));
+                inverse_transpose.fill_column(3, 0.0);
                 inverse_transpose.transpose_mut();
 
                 Some(SurfaceInteraction {
