@@ -122,38 +122,41 @@ pub trait Sampler {
     fn sample(&self, n: &nalgebra::UnitVector3<f32>) -> nalgebra::UnitVector3<f32>;
 }
 
-/// Generates random directions uniformly distributed over the hemisphere
-/// oriented by a given surface normal. It uses rejection sampling inside
-/// a unit sphere and only keeps directions with a positive dot product
-/// with the normal.
 #[derive(Debug)]
-pub struct UniformHemisphereSampler;
+pub struct CosineHemisphereSampler;
 
-impl Sampler for UniformHemisphereSampler {
+impl Sampler for CosineHemisphereSampler {
     fn sample(&self, n: &nalgebra::UnitVector3<f32>) -> nalgebra::UnitVector3<f32> {
         let mut rng = rand::rng();
-        loop {
-            // Generate a random vector inside the cube [-1,1]^3
-            let v = nalgebra::Vector3::new(rng.random(), rng.random(), rng.random()) * 2.0
-                - nalgebra::Vector3::repeat(1.0);
-            // Keep only vectors inside the unit sphere
-            if v.norm_squared() < 1.0 {
-                // Normalize the vector to get a direction
-                let d = nalgebra::UnitVector3::new_normalize(v);
+        let u: f32 = rng.random();
+        let v: f32 = rng.random();
 
-                // Only accept vectors in the same hemisphere as the given normal
-                if d.dot(n) > 0.0 {
-                    return d;
-                }
-            }
-        }
+        let phi = 2.0 * f32::consts::PI * u;
+        let radius = v.sqrt();
+
+        let x = phi.cos() * radius;
+        let y = phi.sin() * radius;
+        let z = (1.0 - v).sqrt();
+
+        let tangent = if n.x.abs() > n.y.abs() {
+            let t = nalgebra::Vector3::new(-n.z, 0.0, n.x);
+            t.normalize()
+        } else {
+            let t = nalgebra::Vector3::new(0.0, n.z, -n.y);
+            t.normalize()
+        };
+        let bitangent = n.cross(&tangent);
+
+        let d = x * tangent + y * bitangent + z * n.as_ref();
+        nalgebra::UnitVector3::new_normalize(d)
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct BsdfSample {
     pub wi: nalgebra::UnitVector3<f32>,
-    pub attenuation: Spectrum,
+    pub f: Spectrum,
+    pub pdf: f32,
 }
 
 pub trait Material: Debug + Sync {
@@ -174,17 +177,21 @@ impl LambertianMaterial {
 impl Material for LambertianMaterial {
     fn sample(&self, si: &SurfaceInteraction, sampler: &dyn Sampler) -> Option<BsdfSample> {
         let wi = sampler.sample(&si.n);
-        Some(BsdfSample {
-            wi,
-            attenuation: self.albedo,
-        })
+        let f = self.albedo / std::f32::consts::PI;
+        let cos_theta = f32::max(0.0, wi.dot(&si.n));
+        if cos_theta == 0.0 {
+            return None;
+        }
+        let pdf = cos_theta / std::f32::consts::PI;
+
+        Some(BsdfSample { wi, f, pdf })
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct LightSample {
     pub wi: nalgebra::UnitVector3<f32>,
-    pub radiance: Spectrum,
+    pub i: Spectrum,
     pub t: f32,
 }
 
@@ -217,7 +224,7 @@ impl Light for PointLight {
 
         let wi = nalgebra::UnitVector3::new_normalize(v);
         let i = self.intensity / (t * t);
-        Some(LightSample { wi, radiance: i, t })
+        Some(LightSample { wi, i, t })
     }
 }
 
@@ -603,7 +610,9 @@ impl WhittedIntegrator {
             let indirect_ray = Ray::new(si.p, bsdf_sample.wi.into_inner());
             let indirect_radiance = self.radiance(&indirect_ray, scene, sampler, depth - 1);
 
-            total_radiance = bsdf_sample.attenuation * indirect_radiance;
+            let cos_theta = f32::max(0.0, bsdf_sample.wi.dot(&si.n));
+            total_radiance = bsdf_sample.f * indirect_radiance * cos_theta / bsdf_sample.pdf;
+
             for light in scene.lights.iter() {
                 if let Some(li_sample) = light.sample(&si, sampler) {
                     let shadow_ray = Ray::new(si.p, li_sample.wi.into_inner());
@@ -611,8 +620,8 @@ impl WhittedIntegrator {
                         .intersect(&shadow_ray, f32::EPSILON, li_sample.t - f32::EPSILON)
                         .is_none()
                     {
-                        let cos_theta = f32::max(0.0, li_sample.wi.into_inner().dot(&si.n));
-                        total_radiance += li_sample.radiance * cos_theta;
+                        let cos_theta = f32::max(0.0, li_sample.wi.dot(&si.n));
+                        total_radiance += li_sample.i * cos_theta;
                     }
                 }
             }
@@ -671,7 +680,7 @@ fn main() {
     ));
 
     let integrator = WhittedIntegrator::default();
-    let sampler = UniformHemisphereSampler;
+    let sampler = CosineHemisphereSampler;
     let mut film = Film::new(args.width, args.height);
     film.scanlines(|y, row, width, height| {
         let mut rng = rand::rng();
