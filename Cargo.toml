@@ -4,3 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.101"
+clap = { version = "4.5.59", features = ["derive"] }
+image = "0.25.9"
+indicatif = { version = "0.18.4", features = ["rayon"] }
+nalgebra = "0.34.1"
+rand = "0.10.0"
+rayon = "1.11.0"
